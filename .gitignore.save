@@ -1,0 +1,15 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+.build/
+
+# Swift Package Manager
+.swiftpm/
+
+# Firebase / secrets
+GoogleService-Info.plist
+Secrets.plist
+
+# macOS
+.DS_Store

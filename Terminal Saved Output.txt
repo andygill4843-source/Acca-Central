@@ -1,0 +1,60 @@
+Last login: Wed Jan 14 13:52:07 on console
+andygill@UNKNOWN ~ % 'sudo pkill TouchBarServer;'
+zsh: command not found: sudo pkill TouchBarServer;
+andygill@UNKNOWN ~ % udo pkill TouchBarServer
+zsh: command not found: udo
+andygill@UNKNOWN ~ % andyGill91
+zsh: command not found: andyGill91
+andygill@UNKNOWN ~ % sudo pkill TouchBarServer
+Password:
+andygill@UNKNOWN ~ % 
+  [Restored 31 Jan 2026 at 09:15:26]
+Last login: Sat Jan 31 09:14:56 on console
+Restored session: Sat 31 Jan 2026 09:13:20 GMT
+andygill@UNKNOWN ~ % 
+andygill@UNKNOWN ~ % xcode-select --install
+xcode-select: note: install requested for command line developer tools
+andygill@UNKNOWN ~ % xcode-select --install
+xcode-select: note: install requested for command line developer tools
+andygill@UNKNOWN ~ % cd /Users/andygill/Desktop/Acca\ Central\ v5/AccaCentral                             
+andygill@UNKNOWN AccaCentral % ls
+AccaCentral		AccaCentral.xcodeproj	AccaCentralTests	AccaCentralUITests
+andygill@UNKNOWN AccaCentral % git init
+Initialized empty Git repository in /Users/andygill/Desktop/Acca Central v5/AccaCentral/.git/
+andygill@UNKNOWN AccaCentral % nano .gitignore
+
+
+
+
+
+
+  UW PICO 5.09                                        File: .gitignore                                        Modified  
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+.build/
+
+# Swift Package Manager
+.swiftpm/
+
+# Firebase / secrets
+GoogleService-Info.plist
+Secrets.plist
+
+# macOS
+.DS_Store
+
+
+
+
+
+
+
+
+
+
+
+^G Get Help         ^O WriteOut         ^R Read File        ^Y Prev Pg          ^K Cut Text         ^C Cur Pos          
+^X Exit             ^J Justify          ^W Where is         ^V Next Pg          ^U UnCut Text       ^T To Spell        
