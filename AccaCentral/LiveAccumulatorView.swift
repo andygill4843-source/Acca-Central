@@ -15,6 +15,8 @@ struct LiveAccumulatorView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var pollTask: Task<Void, Never>?
+    @State private var isManager = false
+    @State private var showingGameWeekSetup = false
 
     var body: some View {
         NavigationStack {
@@ -34,7 +36,25 @@ struct LiveAccumulatorView: View {
                 }
             }
             .navigationTitle("Live")
+            .toolbar {
+                if isManager {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showingGameWeekSetup = true
+                        } label: {
+                            Image(systemName: "plus.circle")
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingGameWeekSetup, onDismiss: {
+                Task { await loadCurrentGameWeekLegs() }
+            }) {
+                GameWeekSetupView()
+                    .environmentObject(appState)
+            }
             .task {
+                await checkIfManager()
                 await loadCurrentGameWeekLegs()
                 startPolling()
             }
@@ -80,6 +100,14 @@ struct LiveAccumulatorView: View {
         }
         return "\(home) - \(away)"
     }
+    
+    private func checkIfManager() async {
+        guard let teamId = appState.currentUser?.teamIds.first,
+              let userId = appState.currentUser?.id else { return }
+        if let team = try? await FirebaseService.shared.fetchTeam(teamId: teamId) {
+            isManager = team.managerId == userId
+        }
+    }
 
     private func statusLabel(for fixture: FootballAPIService.Fixture) -> String {
         switch fixture.status {
@@ -117,7 +145,7 @@ struct LiveAccumulatorView: View {
                 return
             }
 
-            legs = try await FirebaseService.shared.fetchLegs(gameWeekId: gameWeekId)
+            legs = try await FirebaseService.shared.fetchLegs(teamId: teamId, gameWeekId: gameWeekId)
             isLoading = false
             await refreshFixtures()
         } catch {

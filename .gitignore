@@ -13,3 +13,4 @@ Secrets.plist
 
 # macOS
 .DS_Store
+functions/node_modules/

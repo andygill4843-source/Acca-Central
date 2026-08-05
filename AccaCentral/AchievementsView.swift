@@ -1,5 +1,5 @@
 //
-//  StatsView.swift
+//  AchievementsView.swift
 //  AccaCentral
 //
 //  Created by Andy Gill on 05/08/2026.
@@ -8,14 +8,12 @@
 
 import SwiftUI
 
-
-struct StatsView: View {
+struct AchievementsView: View {
     var body: some View {
         NavigationStack {
-            Text("Streaks, popular bet types")
+            Text("Unlocked achievements grid")
                 .foregroundStyle(Color.accaTextSecondary)
-                .navigationTitle("Stats")
+                .navigationTitle("Awards")
         }
     }
 }
-

@@ -88,16 +88,17 @@ final class FirebaseService {
         _ = try db.collection("legs").addDocument(from: leg)
     }
 
-    func fetchLegs(teamId: String) async throws -> [AccumulatorLeg] {
+    func fetchLegs(teamId: String, gameWeekId: String) async throws -> [AccumulatorLeg] {
         let snapshot = try await db.collection("legs")
             .whereField("teamId", isEqualTo: teamId)
+            .whereField("gameWeekId", isEqualTo: gameWeekId)
             .getDocuments()
         return try snapshot.documents.map { try $0.data(as: AccumulatorLeg.self) }
     }
 
-    func fetchLegs(gameWeekId: String) async throws -> [AccumulatorLeg] {
+    func fetchLegs(teamId: String) async throws -> [AccumulatorLeg] {
         let snapshot = try await db.collection("legs")
-            .whereField("gameWeekId", isEqualTo: gameWeekId)
+            .whereField("teamId", isEqualTo: teamId)
             .getDocuments()
         return try snapshot.documents.map { try $0.data(as: AccumulatorLeg.self) }
     }

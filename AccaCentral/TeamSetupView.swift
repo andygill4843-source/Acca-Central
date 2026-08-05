@@ -99,6 +99,15 @@ struct TeamSetupView: View {
                     team = try await FirebaseService.shared.joinTeam(inviteCode: inviteCode.uppercased(), userId: userId)
                 }
 
+                let member = Member(
+                    id: nil,
+                    userId: userId,
+                    displayName: appState.currentUser?.displayName ?? "Player",
+                    teamId: team.id ?? "",
+                    joinedAt: Date()
+                )
+                try await FirebaseService.shared.addMember(member)
+
                 var updatedUser = appState.currentUser!
                 updatedUser.teamIds.append(team.id ?? "")
                 try await FirebaseService.shared.updateUserTeamIds(userId: userId, teamIds: updatedUser.teamIds)
