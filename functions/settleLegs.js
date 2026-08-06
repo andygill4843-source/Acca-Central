@@ -8,14 +8,16 @@ const FINISHED_STATES = ["FT", "AET", "FT_PEN", "ABAN", "CANCL"];
 
 function determineOutcome(leg, homeTeam, awayTeam, homeGoals, awayGoals) {
   const selection = leg.selectionDescription.toLowerCase();
+  const home = homeTeam.toLowerCase();
+  const away = awayTeam.toLowerCase();
 
   if (leg.betType === "Match Winner") {
     const homeWon = homeGoals > awayGoals;
     const awayWon = awayGoals > homeGoals;
     const isDraw = homeGoals === awayGoals;
 
-    if (selection.includes(homeTeam.toLowerCase())) return homeWon ? "won" : "lost";
-    if (selection.includes(awayTeam.toLowerCase())) return awayWon ? "won" : "lost";
+    if (selection.includes(home)) return homeWon ? "won" : "lost";
+    if (selection.includes(away)) return awayWon ? "won" : "lost";
     if (selection.includes("draw")) return isDraw ? "won" : "lost";
     return "pending";
   }
@@ -28,6 +30,43 @@ function determineOutcome(leg, homeTeam, awayTeam, homeGoals, awayGoals) {
     if (selection.includes("over")) return totalGoals > line ? "won" : "lost";
     if (selection.includes("under")) return totalGoals < line ? "won" : "lost";
     return "pending";
+  }
+
+  if (leg.betType === "Both Teams to Score") {
+    const bothScored = homeGoals > 0 && awayGoals > 0;
+    if (selection.startsWith("yes")) return bothScored ? "won" : "lost";
+    if (selection.startsWith("no")) return bothScored ? "lost" : "won";
+    return "pending";
+  }
+
+  if (leg.betType === "Draw No Bet") {
+    const isDraw = homeGoals === awayGoals;
+    if (isDraw) return "void"; // stake refunded — doesn't count as played or won
+
+    const homeWon = homeGoals > awayGoals;
+    if (selection.includes(home)) return homeWon ? "won" : "lost";
+    if (selection.includes(away)) return !homeWon ? "won" : "lost";
+    return "pending";
+  }
+
+  if (leg.betType === "Handicap") {
+    const match = selection.match(/([+-]?\d+(\.\d+)?)/);
+    if (!match) return "pending";
+    const handicapValue = parseFloat(match[1]);
+
+    let adjustedTeamScore, opponentScore;
+    if (selection.includes(home)) {
+      adjustedTeamScore = homeGoals + handicapValue;
+      opponentScore = awayGoals;
+    } else if (selection.includes(away)) {
+      adjustedTeamScore = awayGoals + handicapValue;
+      opponentScore = homeGoals;
+    } else {
+      return "pending";
+    }
+
+    if (adjustedTeamScore === opponentScore) return "void"; // push
+    return adjustedTeamScore > opponentScore ? "won" : "lost";
   }
 
   return "pending";
