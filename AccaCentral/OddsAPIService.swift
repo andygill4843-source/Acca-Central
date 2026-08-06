@@ -11,7 +11,7 @@ import Foundation
 final class OddsAPIService {
     static let shared = OddsAPIService()
     private let baseURL = "https://api.the-odds-api.com/v4"
-    private let apiKey = "YOUR_API_KEY"
+    private let apiKey = "ff585ca95c3be67ff9e85dd16ad3e75d"
 
     private init() {}
 

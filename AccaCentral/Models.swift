@@ -87,6 +87,7 @@ struct AccumulatorLeg: Identifiable, Codable {
 
     var decimalOddsAtSelection: Double
     var bookmaker: String
+    var sportmonksFixtureId: Int?   // resolved at submission time — nil if no confident match found
 
     var outcome: LegOutcome
     var submittedAt: Date

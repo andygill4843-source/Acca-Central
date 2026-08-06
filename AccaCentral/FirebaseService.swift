@@ -118,6 +118,15 @@ final class FirebaseService {
                 onChange(legs)
             }
     }
+    
+    func fetchMember(teamId: String, userId: String) async throws -> Member? {
+        let snapshot = try await db.collection("members")
+            .whereField("teamId", isEqualTo: teamId)
+            .whereField("userId", isEqualTo: userId)
+            .limit(to: 1)
+            .getDocuments()
+        return try snapshot.documents.first.map { try $0.data(as: Member.self) }
+    }
 }
 
 enum FirebaseServiceError: LocalizedError {

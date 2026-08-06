@@ -11,29 +11,56 @@ import SwiftUI
 struct LiveAccumulatorView: View {
     @EnvironmentObject var appState: AppState
     @State private var legs: [AccumulatorLeg] = []
-    @State private var fixtures: [String: FootballAPIService.Fixture] = [:]
+    @State private var fixtures: [String: FootballAPIService.Fixture] = [:] // keyed by leg.id
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var pollTask: Task<Void, Never>?
+
     @State private var isManager = false
     @State private var showingGameWeekSetup = false
+    @State private var showingSubmitLeg = false
+    @State private var currentGameWeekId: String?
+    @State private var currentMemberId: String?
+
+    private var hasSubmittedLeg: Bool {
+        guard let currentMemberId else { return false }
+        return legs.contains { $0.memberId == currentMemberId }
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if isLoading {
-                    ProgressView()
-                } else if let errorMessage {
-                    Text(errorMessage).foregroundStyle(Color.accaLoss)
-                } else if legs.isEmpty {
-                    Text("No legs submitted for this gameweek yet.")
-                        .foregroundStyle(Color.accaTextSecondary)
-                } else {
-                    List(legs) { leg in
-                        legRow(for: leg)
+            VStack(spacing: 0) {
+                if !isLoading && errorMessage == nil && currentGameWeekId != nil && !hasSubmittedLeg {
+                    Button {
+                        showingSubmitLeg = true
+                    } label: {
+                        Text("Pick your leg for this gameweek")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(12)
                     }
-                    .listStyle(.plain)
+                    .background(Color.accaGold)
+                    .foregroundStyle(Color.accaPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding()
                 }
+
+                Group {
+                    if isLoading {
+                        ProgressView()
+                    } else if let errorMessage {
+                        Text(errorMessage).foregroundStyle(Color.accaLoss)
+                    } else if legs.isEmpty {
+                        Text("No legs submitted for this gameweek yet.")
+                            .foregroundStyle(Color.accaTextSecondary)
+                    } else {
+                        List(legs) { leg in
+                            legRow(for: leg)
+                        }
+                        .listStyle(.plain)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .navigationTitle("Live")
             .toolbar {
@@ -53,8 +80,17 @@ struct LiveAccumulatorView: View {
                 GameWeekSetupView()
                     .environmentObject(appState)
             }
+            .sheet(isPresented: $showingSubmitLeg, onDismiss: {
+                Task { await loadCurrentGameWeekLegs() }
+            }) {
+                if let currentGameWeekId, let currentMemberId {
+                    SubmitLegView(gameWeekId: currentGameWeekId, memberId: currentMemberId)
+                        .environmentObject(appState)
+                }
+            }
             .task {
                 await checkIfManager()
+                await loadCurrentMember()
                 await loadCurrentGameWeekLegs()
                 startPolling()
             }
@@ -66,7 +102,7 @@ struct LiveAccumulatorView: View {
 
     @ViewBuilder
     private func legRow(for leg: AccumulatorLeg) -> some View {
-        let fixture = fixtures[leg.fixtureId]
+        let fixture = leg.id.flatMap { fixtures[$0] }
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(leg.fixtureDescription)
@@ -95,12 +131,24 @@ struct LiveAccumulatorView: View {
     }
 
     private func scoreText(for fixture: FootballAPIService.Fixture) -> String {
-        guard let home = fixture.score.fullTime.home, let away = fixture.score.fullTime.away else {
+        guard let home = fixture.homeGoals, let away = fixture.awayGoals else {
             return "vs"
         }
         return "\(home) - \(away)"
     }
-    
+
+    private func statusLabel(for fixture: FootballAPIService.Fixture) -> String {
+        if fixture.isLive { return "Live" }
+        if fixture.isFinished { return "Full time" }
+        return "Kickoff soon"
+    }
+
+    private func statusColor(for fixture: FootballAPIService.Fixture) -> Color {
+        if fixture.isLive { return Color.accaLive }
+        if fixture.isFinished { return Color.accaTextSecondary }
+        return Color.accaPending
+    }
+
     private func checkIfManager() async {
         guard let teamId = appState.currentUser?.teamIds.first,
               let userId = appState.currentUser?.id else { return }
@@ -109,20 +157,11 @@ struct LiveAccumulatorView: View {
         }
     }
 
-    private func statusLabel(for fixture: FootballAPIService.Fixture) -> String {
-        switch fixture.status {
-        case "IN_PLAY", "PAUSED": return "Live"
-        case "FINISHED": return "Full time"
-        case "SCHEDULED": return "Kickoff soon"
-        default: return fixture.status.capitalized
-        }
-    }
-
-    private func statusColor(for fixture: FootballAPIService.Fixture) -> Color {
-        switch fixture.status {
-        case "IN_PLAY", "PAUSED": return Color.accaLive
-        case "FINISHED": return Color.accaTextSecondary
-        default: return Color.accaPending
+    private func loadCurrentMember() async {
+        guard let teamId = appState.currentUser?.teamIds.first,
+              let userId = appState.currentUser?.id else { return }
+        if let member = try? await FirebaseService.shared.fetchMember(teamId: teamId, userId: userId) {
+            currentMemberId = member.id
         }
     }
 
@@ -141,10 +180,12 @@ struct LiveAccumulatorView: View {
 
             guard let currentGameWeek = current, let gameWeekId = currentGameWeek.id else {
                 errorMessage = "No active gameweek."
+                currentGameWeekId = nil
                 isLoading = false
                 return
             }
 
+            currentGameWeekId = gameWeekId
             legs = try await FirebaseService.shared.fetchLegs(teamId: teamId, gameWeekId: gameWeekId)
             isLoading = false
             await refreshFixtures()
@@ -156,9 +197,9 @@ struct LiveAccumulatorView: View {
 
     private func refreshFixtures() async {
         for leg in legs {
-            guard let fixtureId = Int(leg.fixtureId) else { continue }
-            if let fetched = try? await FootballAPIService.shared.fetchFixture(id: fixtureId) {
-                fixtures[leg.fixtureId] = fetched
+            guard let legId = leg.id, let sportmonksId = leg.sportmonksFixtureId else { continue }
+            if let fetched = try? await FootballAPIService.shared.fetchFixture(id: sportmonksId) {
+                fixtures[legId] = fetched
             }
         }
     }
