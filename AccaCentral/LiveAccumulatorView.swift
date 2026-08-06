@@ -19,8 +19,11 @@ struct LiveAccumulatorView: View {
     @State private var isManager = false
     @State private var showingGameWeekSetup = false
     @State private var showingSubmitLeg = false
-    @State private var currentGameWeekId: String?
+    @State private var currentGameWeek: GameWeek?
     @State private var currentMemberId: String?
+    @State private var showingManualSettlement = false
+    @State private var showingAccumulatorSummary = false
+    @State private var totalMembers = 0
 
     private var hasSubmittedLeg: Bool {
         guard let currentMemberId else { return false }
@@ -30,7 +33,7 @@ struct LiveAccumulatorView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if !isLoading && errorMessage == nil && currentGameWeekId != nil && !hasSubmittedLeg {
+                if !isLoading && errorMessage == nil, let currentGameWeek, !currentGameWeek.isSettled, !hasSubmittedLeg {
                     Button {
                         showingSubmitLeg = true
                     } label: {
@@ -65,11 +68,38 @@ struct LiveAccumulatorView: View {
             .navigationTitle("Live")
             .toolbar {
                 if isManager {
+                    if currentGameWeek == nil || currentGameWeek?.isSettled == true {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                showingGameWeekSetup = true
+                            } label: {
+                                Image(systemName: "plus.circle")
+                            }
+                        }
+                    }
+                    if let currentGameWeek, !currentGameWeek.isSettled, totalMembers > 0, legs.count >= totalMembers {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                showingAccumulatorSummary = true
+                            } label: {
+                                Image(systemName: "chart.bar.doc.horizontal")
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            showingGameWeekSetup = true
+                            showingManualSettlement = true
                         } label: {
-                            Image(systemName: "plus.circle")
+                            Image(systemName: "checkmark.circle")
+                        }
+                    }
+                    if let currentGameWeek, !currentGameWeek.isSettled {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                endGameWeek()
+                            } label: {
+                                Image(systemName: "flag.checkered")
+                            }
                         }
                     }
                 }
@@ -83,14 +113,27 @@ struct LiveAccumulatorView: View {
             .sheet(isPresented: $showingSubmitLeg, onDismiss: {
                 Task { await loadCurrentGameWeekLegs() }
             }) {
-                if let currentGameWeekId, let currentMemberId {
-                    SubmitLegView(gameWeekId: currentGameWeekId, memberId: currentMemberId)
+                if let currentGameWeek, let currentMemberId {
+                    SubmitLegView(gameWeek: currentGameWeek, memberId: currentMemberId)
+                        .environmentObject(appState)
+                }
+            }
+            .sheet(isPresented: $showingManualSettlement, onDismiss: {
+                Task { await loadCurrentGameWeekLegs() }
+            }) {
+                ManualSettlementView()
+                    .environmentObject(appState)
+            }
+            .sheet(isPresented: $showingAccumulatorSummary) {
+                if let currentGameWeek {
+                    AccumulatorSummaryView(gameWeek: currentGameWeek)
                         .environmentObject(appState)
                 }
             }
             .task {
                 await checkIfManager()
                 await loadCurrentMember()
+                await loadMemberCount()
                 await loadCurrentGameWeekLegs()
                 startPolling()
             }
@@ -128,6 +171,21 @@ struct LiveAccumulatorView: View {
             }
         }
         .padding(.vertical, 6)
+    }
+    
+    private func loadMemberCount() async {
+        guard let teamId = appState.currentUser?.teamIds.first else { return }
+        if let members = try? await FirebaseService.shared.fetchMembers(teamId: teamId) {
+            totalMembers = members.count
+        }
+    }
+    
+    private func endGameWeek() {
+        guard let gameWeekId = currentGameWeek?.id else { return }
+        Task {
+            try? await FirebaseService.shared.settleGameWeek(gameWeekId: gameWeekId)
+            await loadCurrentGameWeekLegs()
+        }
     }
 
     private func scoreText(for fixture: FootballAPIService.Fixture) -> String {
@@ -173,19 +231,17 @@ struct LiveAccumulatorView: View {
         }
         do {
             let gameWeeks = try await FirebaseService.shared.fetchGameWeeks(teamId: teamId)
-            let now = Date()
-            let current = gameWeeks.first { $0.startDate <= now && now <= $0.endDate }
-                ?? gameWeeks.last { $0.startDate <= now }
-                ?? gameWeeks.first
+            let current = gameWeeks.first { !$0.isSettled } ?? gameWeeks.last
 
-            guard let currentGameWeek = current, let gameWeekId = currentGameWeek.id else {
+            guard let resolvedGameWeek = current, let gameWeekId = resolvedGameWeek.id else {
                 errorMessage = "No active gameweek."
-                currentGameWeekId = nil
+                currentGameWeek = nil
                 isLoading = false
                 return
             }
 
-            currentGameWeekId = gameWeekId
+            currentGameWeek = resolvedGameWeek
+            errorMessage = nil
             legs = try await FirebaseService.shared.fetchLegs(teamId: teamId, gameWeekId: gameWeekId)
             isLoading = false
             await refreshFixtures()

@@ -45,11 +45,13 @@ final class OddsAPIService {
     struct Bookmaker: Codable {
         let key: String
         let title: String
+        let link: String?
         let markets: [Market]
     }
 
     struct Market: Codable {
         let key: String
+        let link: String?
         let outcomes: [Outcome]
     }
 
@@ -57,10 +59,30 @@ final class OddsAPIService {
         let name: String
         let price: Double
         let point: Double?
+        let link: String?
     }
 
-    func fetchOdds(league: SoccerLeague, markets: [String] = ["h2h", "totals"]) async throws -> [OddsEvent] {
+    func fetchOdds(league: SoccerLeague, markets: [String] = ["h2h", "totals", "spreads"]) async throws -> [OddsEvent] {
         var components = URLComponents(string: "\(baseURL)/sports/\(league.rawValue)/odds")!
+        components.queryItems = [
+            URLQueryItem(name: "apiKey", value: apiKey),
+            URLQueryItem(name: "regions", value: "uk"),
+            URLQueryItem(name: "markets", value: markets.joined(separator: ",")),
+            URLQueryItem(name: "oddsFormat", value: "decimal"),
+            URLQueryItem(name: "includeLinks", value: "true")
+        ]
+
+        let (data, _) = try await URLSession.shared.data(from: components.url!)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([OddsEvent].self, from: data)
+    }
+
+    /// Fetches full odds for ONE event, including markets not available on the
+    /// bulk /odds endpoint (btts, draw_no_bet). Called when a member drills
+    /// into a specific fixture, not when browsing the fixture list.
+    func fetchEventOdds(league: SoccerLeague, eventId: String, markets: [String] = ["h2h", "totals", "spreads", "btts", "draw_no_bet"]) async throws -> OddsEvent {
+        var components = URLComponents(string: "\(baseURL)/sports/\(league.rawValue)/events/\(eventId)/odds")!
         components.queryItems = [
             URLQueryItem(name: "apiKey", value: apiKey),
             URLQueryItem(name: "regions", value: "uk"),
@@ -71,7 +93,7 @@ final class OddsAPIService {
         let (data, _) = try await URLSession.shared.data(from: components.url!)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([OddsEvent].self, from: data)
+        return try decoder.decode(OddsEvent.self, from: data)
     }
 
     func bestPrice(for outcomeName: String, marketKey: String, in event: OddsEvent) -> (price: Double, bookmaker: String)? {

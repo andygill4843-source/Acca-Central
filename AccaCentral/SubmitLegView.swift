@@ -12,7 +12,7 @@ struct SubmitLegView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
-    let gameWeekId: String
+    let gameWeek: GameWeek
     let memberId: String
 
     @State private var selectedLeague: OddsAPIService.SoccerLeague = .premierLeague
@@ -55,7 +55,8 @@ struct SubmitLegView: View {
                         NavigationLink {
                             PickOutcomeView(
                                 event: event,
-                                gameWeekId: gameWeekId,
+                                league: selectedLeague,
+                                gameWeekId: gameWeek.id ?? "",
                                 memberId: memberId,
                                 teamId: appState.currentUser?.teamIds.first ?? "",
                                 onSubmitted: { dismiss() }
@@ -90,7 +91,10 @@ struct SubmitLegView: View {
         isLoading = true
         errorMessage = nil
         do {
-            events = try await OddsAPIService.shared.fetchOdds(league: selectedLeague)
+            let allEvents = try await OddsAPIService.shared.fetchOdds(league: selectedLeague)
+            events = allEvents.filter {
+                $0.commenceTime >= gameWeek.startDate && $0.commenceTime <= gameWeek.endDate
+            }
             isLoading = false
         } catch {
             errorMessage = "Couldn't load fixtures/odds."

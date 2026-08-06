@@ -51,6 +51,8 @@ struct GameWeek: Identifiable, Codable {
     var startDate: Date
     var endDate: Date
     var isSettled: Bool
+    var selectedBookmaker: String?
+    var combinedOdds: Double?
 }
 
 // MARK: - Bet types & outcomes
@@ -63,10 +65,11 @@ enum BetType: String, Codable, CaseIterable {
     case matchWinner = "Match Winner"
     case bothTeamsToScore = "Both Teams to Score"
     case overUnderGoals = "Over/Under Goals"
+    case drawNoBet = "Draw No Bet"
+    case handicap = "Handicap"
     case correctScore = "Correct Score"
     case anytimeScorer = "Anytime Goalscorer"
     case doubleChance = "Double Chance"
-    case handicap = "Handicap"
     case other = "Other"
 }
 
@@ -87,6 +90,8 @@ struct AccumulatorLeg: Identifiable, Codable {
 
     var decimalOddsAtSelection: Double
     var bookmaker: String
+    var bookmakerPrices: [String: Double]   // every bookmaker's price for this exact selection
+    var bookmakerLinks: [String: String]    // bookmaker -> betslip link, where one exists
     var sportmonksFixtureId: Int?   // resolved at submission time — nil if no confident match found
 
     var outcome: LegOutcome

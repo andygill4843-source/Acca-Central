@@ -26,7 +26,7 @@ struct GameWeekSetupView: View {
                 }
 
                 Section("Window") {
-                    DatePicker("First kickoff", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("First kickoff", selection: $startDate, in: Date()...Date().addingTimeInterval(14 * 24 * 60 * 60), displayedComponents: [.date, .hourAndMinute])
                     DatePicker("Deadline / last match", selection: $endDate, displayedComponents: [.date, .hourAndMinute])
                 }
 
@@ -72,21 +72,33 @@ struct GameWeekSetupView: View {
             errorMessage = "Deadline must be after the first kickoff."
             return
         }
+        guard startDate <= Date().addingTimeInterval(14 * 24 * 60 * 60) else {
+            errorMessage = "Gameweeks can only be set up within the next two weeks — bookmaker odds aren't posted further ahead than that."
+            return
+        }
 
         errorMessage = nil
         isLoading = true
 
-        let gameWeek = GameWeek(
-            id: nil,
-            teamId: teamId,
-            weekNumber: weekNumber,
-            startDate: startDate,
-            endDate: endDate,
-            isSettled: false
-        )
-
         Task {
             do {
+                let existing = try await FirebaseService.shared.fetchGameWeeks(teamId: teamId)
+                if existing.contains(where: { !$0.isSettled }) {
+                    await MainActor.run {
+                        isLoading = false
+                        errorMessage = "There's already an active gameweek. End it before creating a new one."
+                    }
+                    return
+                }
+
+                let gameWeek = GameWeek(
+                    id: nil,
+                    teamId: teamId,
+                    weekNumber: weekNumber,
+                    startDate: startDate,
+                    endDate: endDate,
+                    isSettled: false
+                )
                 _ = try await FirebaseService.shared.createGameWeek(gameWeek)
                 await MainActor.run {
                     isLoading = false

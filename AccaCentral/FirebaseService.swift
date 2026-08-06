@@ -127,6 +127,19 @@ final class FirebaseService {
             .getDocuments()
         return try snapshot.documents.first.map { try $0.data(as: Member.self) }
     }
+    
+    func setGameWeekBookmaker(gameWeekId: String, bookmaker: String, combinedOdds: Double) async throws {
+        try await db.collection("gameWeeks").document(gameWeekId).updateData([
+            "selectedBookmaker": bookmaker,
+            "combinedOdds": combinedOdds
+        ])
+    }
+    
+    func settleGameWeek(gameWeekId: String) async throws {
+        try await db.collection("gameWeeks").document(gameWeekId).updateData([
+            "isSettled": true
+        ])
+    }
 }
 
 enum FirebaseServiceError: LocalizedError {
