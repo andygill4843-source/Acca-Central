@@ -52,3 +52,5 @@ exports.remindPendingLegs = onSchedule("every 30 minutes", async () => {
     }
   }
 });
+
+exports.settleLegs = require("./settleLegs").settleLegs;
